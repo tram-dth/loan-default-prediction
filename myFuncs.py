@@ -28,17 +28,18 @@ from sklearn.metrics import roc_auc_score, roc_curve
 
 
 
-irrelevants = ['current_pincode', 
-               'current_pincode_id', 
-               'disbursal_date',
-               'uniqueid']
+irrelevant_vars =  [ 'current_pincode_id', 
+                     'disbursal_date', 
+                     'uniqueid', 
+                     'perform_cns_score_description']
+
+
 
 id_vars = ['branch_id', 
            'supplier_id', 
            'manufacturer_id', 
            'state_id', 
-           'employee_code_id',
-           'cns_type']
+           'employee_code_id']
 
 binary = ['employed',
           'mobileno_avl_flag', 
@@ -116,16 +117,14 @@ large_num_vars = [
     'primary_instal_amt'
     ]
 
-all_vars = [
+x_vars = [
      'aadhar_flag',
      'age',
      'asset_cost',
      'average_acct_age',
      'branch_id',
      'cns',
-     'cns_type',
      'credit_his_len',
-     'defaulted',
      'delinquent_accts_in_last_six_months',
      'disbursed_amount',
      'driving_flag',
@@ -158,11 +157,14 @@ all_vars = [
     ]
 
 
+
+y_vars = ['defaulted']
+
 # =============================================================================
 # DATA IMPORT AND PROCESSING
 # =============================================================================
 
-def import_csv(filename, rescale = False):
+def import_csv(filename):
     df = pd.read_csv(filename, header=0) 
     df = df.rename(str.lower, axis='columns')
     return df
@@ -170,10 +172,12 @@ def import_csv(filename, rescale = False):
 
 
 def data_format(df, log_transform):  
+    #drop unnecessary variables
+    df.drop(irrelevant_vars, axis = 'columns', inplace = True)
+    
     
     #rename some var
     df.rename({'perform_cns_score': 'cns', 
-               'perform_cns_score_description': 'cns_type',
                'credit_history_length': 'credit_his_len',
                'loan_default': 'defaulted'}, 
               axis = 1, 
@@ -199,32 +203,6 @@ def data_format(df, log_transform):
     df['employed'] = np.where(df['employment_type'] == 'Salaried', 1, 0)
     df.drop(['employment_type'], axis = 'columns', inplace = True)
     
-    
-    #encode description of Bureau Score (perform cns score)
-    d_cns = {
-     'A-Very Low Risk': 1,
-     'B-Very Low Risk': 2,
-     'C-Very Low Risk': 3,
-     'D-Very Low Risk': 4,
-     'E-Low Risk': 5,
-     'F-Low Risk': 6,
-     'G-Low Risk': 7,
-     'H-Medium Risk': 8,
-     'I-Medium Risk': 9,
-     'J-High Risk': 10,
-     'K-High Risk': 11,
-     'L-Very High Risk': 12,
-     'M-Very High Risk': 13,
-     'Not Scored: More than 50 active Accounts found': 0,
-     'Not Scored: No Activity seen on the customer (Inactive)': 0,
-     'Not Scored: No Updates available in last 36 months': 0,
-     'Not Scored: Not Enough Info available on the customer': 0,
-     'Not Scored: Only a Guarantor': 0,
-     'Not Scored: Sufficient History Not Available': 0,
-     'No Bureau History Available': 0}
-    
-    
-    df['cns_type'] = df['cns_type'].apply(lambda x: d_cns[x])
     
 
     #credit history length
@@ -427,20 +405,19 @@ def boxplot_vars(df, categorical, continuous_vars, print_folder = False):
 # FOR CLASSIFICATION MODELS
 # =============================================================================
     
-def classification_performance(y_true, y_pred, y_pred_p = False, draw_roc = False):
-   
-   #precision = precision_score(y_true, y_pred)
-   #recall = recall_score(y_true, y_pred)
-   #cm = confusion_matrix(y_true, y_pred= y_pred)
-   
+def classification_performance(y_true, y_pred, all_indicators = False):
+    
     f1 = f1_score(y_true, y_pred)
     auc = roc_auc_score(y_true, y_pred, average=None)   
-    if y_pred_p:
-        acc = roc_auc_score(y_true, y_pred_p) 
-    else:
-        acc = roc_auc_score(y_true, y_pred)
+    acc = roc_auc_score(y_true, y_pred)
+    results = [auc, acc, f1]
     
-    return auc, acc, f1
+    if all_indicators:
+        precision = precision_score(y_true, y_pred)
+        recall = recall_score(y_true, y_pred)
+        results.extend([precision, recall])
+    
+    return tuple(results)
 
 
 def draw_roc(y, y_pred_p):   
