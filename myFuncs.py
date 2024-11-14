@@ -27,6 +27,16 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.metrics import roc_auc_score, roc_curve
 
 
+import imblearn
+from imblearn.pipeline import Pipeline
+from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
+
+
+# =============================================================================
+# VARIABLE NAMES
+# =============================================================================
+
 
 irrelevant_vars =  [ 'current_pincode_id', 
                      'disbursal_date', 
@@ -302,8 +312,6 @@ def corr_mat_heatmap(df, continuous_vars):
 
 
 
-
-
 # =============================================================================
 # FOR VISUALISATION
 # =============================================================================
@@ -383,13 +391,13 @@ def hist_cumulative(df, var, bins, colour):
 
 
 def boxplot(df, categorical, continuous, print_folder):
-    bp = sns.boxplot(data=df, x=categorical, y=continuous, width=.4)
+    bp = sns.boxplot(data=df, x=categorical, y=continuous, hue= categorical, fill =  False, width=.4)
     bp_fig = bp.get_figure()  
     plt.show()
     
     if print_folder:
         path = os.path.join(print_folder, f'boxplot_{continuous}')
-        bp_fig.savefig()
+        bp_fig.savefig(path)
    
     plt.close(bp_fig)
     
@@ -404,6 +412,18 @@ def boxplot_vars(df, categorical, continuous_vars, print_folder = False):
 # =============================================================================
 # FOR CLASSIFICATION MODELS
 # =============================================================================
+
+#manual combination of over and under sampling
+def over_under_sampler():
+    over = RandomOverSampler(sampling_strategy=0.1)
+    under = RandomUnderSampler(sampling_strategy=0.5)
+    # define pipeline
+    pipeline = Pipeline(steps=[('o', over), ('u', under)])
+    
+    return pipeline
+    
+
+
     
 def classification_performance(y_true, y_pred, all_indicators = False):
     

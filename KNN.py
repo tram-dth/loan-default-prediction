@@ -1,55 +1,43 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Nov 13 14:26:09 2024
+Created on Thu Nov 14 15:54:56 2024
 
 @author: dthtr
 """
 
-
-import numpy as np 
 import pandas as pd
-
-import matplotlib.pyplot as plt
+import numpy as np
 
 from sklearn import set_config
 set_config(transform_output = "pandas")
+from sklearn.neighbors import KNeighborsClassifier
 
-import xgboost as xgb
 
+#___my own modules_______
 import myFuncs as mf
 
 
-
-def xgboost_model(run_num, x_train, x_test, y_train, y_test, n_trees, tree_depth, pos_weight):
-  
-    model = xgb.XGBClassifier(colsample_bytree = 0.3, 
-                              learning_rate = 0.1,
-                              max_depth = tree_depth, 
-                              alpha = 5, 
-                              n_estimators = n_trees, 
-                              random_state = run_num, 
-                              scale_pos_weight = pos_weight)
-
-            
+def knn(x_train, x_test, y_train, y_test, k):
+    model = KNeighborsClassifier(n_neighbors=k)
+    
     # Train the model using the training sets
-
     model.fit(x_train, y_train)
-      
+    
     # Make predictions on training and testing sets
     y_pred_test = model.predict(x_test)
     y_pred_train = model.predict(x_train) 
-    
+
     
     #performance indicators on training and testing sets
     #auc, acc, f1
-    perf_train = mf.classification_performance(y_train, y_pred_train, all_indicators=True)
-    perf_test = mf.classification_performance(y_test, y_pred_test, all_indicators=True)   
-
-    return perf_train, perf_test
+    perf_train = mf.classification_performance(y_train, y_pred_train, all_indicators = True)
+    perf_test = mf.classification_performance(y_test, y_pred_test, all_indicators = True)
     
+    return perf_train, perf_test
 
 
-def trials(df, x_vars, y_vars, n_trees, tree_depth, pos_weight, max_expruns, over_under_sampling = False): 
+
+def trials(df, x_vars, y_vars, k, max_expruns, over_under_sampling = False): 
     auc_all_train = [0]*max_expruns
     acc_all_train = [0]*max_expruns
     f1_all_train = [0]*max_expruns
@@ -64,21 +52,18 @@ def trials(df, x_vars, y_vars, n_trees, tree_depth, pos_weight, max_expruns, ove
 
     for run_num in range(0, max_expruns): 
         
-        x_train, x_test, y_train, y_test = mf.data_split_random(df, x_vars, y_vars, run_num)
+        x_train, x_test, y_train, y_test = mf.data_split_random(df, x_vars, y_vars, 50 - run_num)
         
         if over_under_sampling == True:
             resampler = mf.over_under_sampler()
             x_train, y_train = resampler.fit_resample(x_train, y_train)
             
         
-        result_train, result_test = xgboost_model(run_num, 
-                                                  x_train, 
-                                                  x_test, 
-                                                  y_train.values.ravel(), 
-                                                  y_test.values.ravel(), 
-                                                  n_trees, 
-                                                  tree_depth,
-                                                  pos_weight)
+        result_train, result_test = knn(x_train, 
+                                        x_test, 
+                                        y_train.values.ravel(), 
+                                        y_test.values.ravel(), 
+                                        k)
         auc_all_train[run_num] = result_train[0]
         acc_all_train[run_num] = result_train[1]
         f1_all_train[run_num] = result_train[2]
@@ -96,17 +81,17 @@ def trials(df, x_vars, y_vars, n_trees, tree_depth, pos_weight, max_expruns, ove
         
     return  train, test
 
-    
 
-def class_weight_eperiment(df, x_vars, y_vars, n_trees, tree_depth, pos_weight_range, max_expruns):
+
+def k_experiment(df, x_vars, y_vars, k_range, max_expruns, over_under_sampling = False):
     results_train = {}
     results_test = {}
-    for w in pos_weight_range:
-        r_train, r_test = trials(df, x_vars, y_vars, n_trees, tree_depth, w, max_expruns)
-        results_train[w] = r_train
-        results_test[w] = r_test
+    for k in k_range:
+        r_train, r_test = trials(df, x_vars, y_vars, k, max_expruns, over_under_sampling)
+        results_train[k] = r_train
+        results_test[k] = r_test
+    
     return results_train, results_test
-        
 
 
 def print_results(results, file_name, no_indi = 3):
@@ -116,12 +101,13 @@ def print_results(results, file_name, no_indi = 3):
             'mean_f1_score', 'sd_f1_score',
             'mean_precision', 'sd_precision',
             'mean_recall', 'sd_recall']
+    
     indis = ['auc', 'acc', 'f1_score', 'precision', 'recall']
     
     L = []
     for k in results.keys():
         row = [k]
-        print('\n\nXGboost performance at scale_pos_weight =  : ', k)
+        print('\n\KNN performance at the number of neighbour k =  : ', k)
         for i in range(0, no_indi):
             mean_indicator = np.mean(results[k][i]).round(4)
             sd_indicator = np.std(results[k][i], axis = 0).round(2)
@@ -136,8 +122,3 @@ def print_results(results, file_name, no_indi = 3):
     #print to csv
     L.to_csv(file_name, sep = ',', header=True)
    
-
-
-    
-
-

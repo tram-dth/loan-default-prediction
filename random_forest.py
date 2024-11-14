@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Nov 13 14:26:09 2024
+Created on Wed Nov 13 13:56:04 2024
 
 @author: dthtr
 """
@@ -11,45 +11,59 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 
+import random
+
 from sklearn import set_config
 set_config(transform_output = "pandas")
 
-import xgboost as xgb
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
+
+from sklearn import metrics
+from sklearn.metrics import auc, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.metrics import confusion_matrix
+
+from sklearn.model_selection import cross_val_score
+
+from sklearn.ensemble import RandomForestClassifier
+
+from sklearn.ensemble import ExtraTreesClassifier
+
+import imblearn 
+from imblearn.over_sampling import RandomOverSampler
+
 
 import myFuncs as mf
 
 
 
-def xgboost_model(run_num, x_train, x_test, y_train, y_test, n_trees, tree_depth, pos_weight):
-  
-    model = xgb.XGBClassifier(colsample_bytree = 0.3, 
-                              learning_rate = 0.1,
-                              max_depth = tree_depth, 
-                              alpha = 5, 
-                              n_estimators = n_trees, 
-                              random_state = run_num, 
-                              scale_pos_weight = pos_weight)
-
-            
-    # Train the model using the training sets
-
-    model.fit(x_train, y_train)
-      
+def random_forest(run_num, x_train, x_test, y_train, y_test, n_trees, tree_depth, weight):
+    model = RandomForestClassifier(n_estimators=n_trees, 
+                                   max_depth=tree_depth, 
+                                   random_state=run_num,
+                                   class_weight=weight)
+    
+    model.fit(x_train, y_train)    
+    
     # Make predictions on training and testing sets
     y_pred_test = model.predict(x_test)
     y_pred_train = model.predict(x_train) 
-    
+
     
     #performance indicators on training and testing sets
     #auc, acc, f1
-    perf_train = mf.classification_performance(y_train, y_pred_train, all_indicators=True)
-    perf_test = mf.classification_performance(y_test, y_pred_test, all_indicators=True)   
-
-    return perf_train, perf_test
+    perf_train = mf.classification_performance(y_train, y_pred_train, all_indicators= True)
+    perf_test = mf.classification_performance(y_test, y_pred_test, all_indicators= True)
     
+    
+    return perf_train, perf_test
 
 
-def trials(df, x_vars, y_vars, n_trees, tree_depth, pos_weight, max_expruns, over_under_sampling = False): 
+
+
+
+def trials(df, x_vars, y_vars, n_trees, tree_depth, weight, max_expruns, over_under_sampling = False): 
     auc_all_train = [0]*max_expruns
     acc_all_train = [0]*max_expruns
     f1_all_train = [0]*max_expruns
@@ -61,24 +75,25 @@ def trials(df, x_vars, y_vars, n_trees, tree_depth, pos_weight, max_expruns, ove
     f1_all_test = [0]*max_expruns
     precision_all_test = [0]*max_expruns
     recall_all_test = [0]*max_expruns
+    
 
     for run_num in range(0, max_expruns): 
         
         x_train, x_test, y_train, y_test = mf.data_split_random(df, x_vars, y_vars, run_num)
         
         if over_under_sampling == True:
-            resampler = mf.over_under_sampler()
-            x_train, y_train = resampler.fit_resample(x_train, y_train)
-            
+           resampler = mf.over_under_sampler()
+           x_train, y_train = resampler.fit_resample(x_train, y_train)
         
-        result_train, result_test = xgboost_model(run_num, 
+        result_train, result_test = random_forest(run_num,
                                                   x_train, 
                                                   x_test, 
-                                                  y_train.values.ravel(), 
+                                                  y_train.values.ravel(),
                                                   y_test.values.ravel(), 
-                                                  n_trees, 
-                                                  tree_depth,
-                                                  pos_weight)
+                                                  n_trees,
+                                                  tree_depth, 
+                                                  weight)
+        
         auc_all_train[run_num] = result_train[0]
         acc_all_train[run_num] = result_train[1]
         f1_all_train[run_num] = result_train[2]
@@ -93,20 +108,37 @@ def trials(df, x_vars, y_vars, n_trees, tree_depth, pos_weight, max_expruns, ove
         
         train = (auc_all_train, acc_all_train, f1_all_train, precision_all_train, recall_all_train)
         test = (auc_all_test, acc_all_test, f1_all_test, precision_all_test, recall_all_test) 
-        
+    
     return  train, test
 
-    
 
-def class_weight_eperiment(df, x_vars, y_vars, n_trees, tree_depth, pos_weight_range, max_expruns):
+
+def class_weight_eperiment(df, x_vars, y_vars, n_trees, tree_depth, class_weight_range, max_expruns):
     results_train = {}
     results_test = {}
-    for w in pos_weight_range:
+    for w in class_weight_range:
         r_train, r_test = trials(df, x_vars, y_vars, n_trees, tree_depth, w, max_expruns)
-        results_train[w] = r_train
-        results_test[w] = r_test
+        pos_w = w[1]
+        results_train[pos_w] = r_train
+        results_test[pos_w] = r_test
     return results_train, results_test
+
+
         
+    
+
+def n_trees_experiment(df, x_vars, y_vars, n_trees_range, tree_depth, max_expruns):
+    results_train = {}
+    results_test = {}
+    for n_trees in n_trees_range:
+        r_train, r_test = trials(df, x_vars, y_vars, n_trees, tree_depth, max_expruns)
+        results_train[n_trees] = r_train
+        results_test[n_trees] = r_test
+        
+    return results_train, results_test
+    
+
+
 
 
 def print_results(results, file_name, no_indi = 3):
@@ -121,7 +153,7 @@ def print_results(results, file_name, no_indi = 3):
     L = []
     for k in results.keys():
         row = [k]
-        print('\n\nXGboost performance at scale_pos_weight =  : ', k)
+        print('\n\nRandom Forest performance at positive class weight =  : ', k)
         for i in range(0, no_indi):
             mean_indicator = np.mean(results[k][i]).round(4)
             sd_indicator = np.std(results[k][i], axis = 0).round(2)
@@ -140,4 +172,4 @@ def print_results(results, file_name, no_indi = 3):
 
     
 
-
+     
