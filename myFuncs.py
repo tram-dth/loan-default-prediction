@@ -103,14 +103,12 @@ log_vars = [
      'pri_disbursed_amount',
      'pri_no_of_accts',
      'pri_overdue_accts',
-     'pri_sanctioned_amount',
      'primary_instal_amt',
      'sec_active_accts',
      'sec_disbursed_amount',
      'sec_instal_amt',
      'sec_no_of_accts',
-     'sec_overdue_accts',
-     'sec_sanctioned_amount'
+     'sec_overdue_accts'
     ]
 
 
@@ -142,7 +140,6 @@ x_vars = [
      'employee_code_id',
      'ltv',
      'manufacturer_id',
-     'mobileno_avl_flag',
      'new_accts_in_last_six_months',
      'no_of_inquiries',
      'pan_flag',
@@ -152,7 +149,6 @@ x_vars = [
      'pri_disbursed_amount',
      'pri_no_of_accts',
      'pri_overdue_accts',
-     'pri_sanctioned_amount',
      'primary_instal_amt',
      'sec_active_accts',
      'sec_current_balance',
@@ -160,7 +156,6 @@ x_vars = [
      'sec_instal_amt',
      'sec_no_of_accts',
      'sec_overdue_accts',
-     'sec_sanctioned_amount',
      'state_id',
      'supplier_id',
      'voterid_flag'
@@ -429,7 +424,7 @@ def classification_performance(y_true, y_pred, all_indicators = False):
     
     f1 = f1_score(y_true, y_pred)
     auc = roc_auc_score(y_true, y_pred, average=None)   
-    acc = roc_auc_score(y_true, y_pred)
+    acc = accuracy_score(y_true, y_pred)
     results = [auc, acc, f1]
     
     if all_indicators:

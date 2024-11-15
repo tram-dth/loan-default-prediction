@@ -11,18 +11,19 @@ Created on Wed Nov 13 15:53:00 2024
 
 #my own files
 import myFuncs as mf
-from myFuncs import continuous_vars
+from myFuncs import continuous_vars, x_vars
 
 import PCA_reduced
 import logistic_regress
 import logistic_regress_oversample
 import decision_tree
+import random_forest
 import XGBoost
 
 
 
 
-#_____SOME GLOBAL VARS AND FUNCTIONS__________________
+#_____DATA IMPORT AND PREPROCESSING__________________
 
 data_path = 'data\\train.csv'
 
@@ -40,24 +41,19 @@ def data(data_path, log_transform, remove_outliers_var):
 
 
 
-#______________DATA PREPROCESSING__________________________________________
-
 df = data(data_path, log_transform = True, remove_outliers_var = 'pri_current_balance')
 
 
 #df = PCA_reduced.PCA_reduced(df, continuous_vars)
 
-
-
-#________________var names__________________________
 all_vars = df.columns
 all_vars = list(all_vars)
 y_var = 'defaulted'
-x_vars = [v for v in all_vars if v != y_var]
 
 
-#__logistic regression with different decision threshold
 
+
+#__________LOGISTIC REGRESSION
 decision_threshold_range = [0.4, 0.45, 0.5, 0.55, 0.6]
 
 #with class_weight = 'balanced"
@@ -77,7 +73,7 @@ logistic_regress_oversample.decision_threshold_experiment(df,
 
 
 
-#_________decision trees with different depths___________
+#_________DECISON TREE___________
 #no oversampling
 tree_depth_range = [i for i in range(5, 61)]
 dt_results_train, dt_results_test = decision_tree.tree_depth_experiment(df, 
@@ -90,6 +86,7 @@ decision_tree.print_results(dt_results_train, 'decision_tree_perf_train_allvars.
 decision_tree.print_results(dt_results_test, 'decision_tree_perf_test_allvars.csv')
 #seems like stuff plateau around depth = 40
 
+
 #with oversampling
 tree_depth_range = [i for i in range(5, 61)]
 dt_results_train_over, dt_results_test_over = decision_tree.tree_depth_experiment(df, 
@@ -101,198 +98,90 @@ dt_results_train_over, dt_results_test_over = decision_tree.tree_depth_experimen
 decision_tree.print_results(dt_results_train_over, 'decision_tree_oversample_perf_train_allvars.csv')
 decision_tree.print_results(dt_results_test_over, 'decision_tree_oversample_perf_test_allvars.csv')
 
-#________random forest____different method of sampling___________
 
 
 
 
+#________RANDOM FOREST_______________
+class_weight_range = [ 
+    {0: 1, 1: 1},
+    {0: 1, 1: 3},
+    {0: 1, 1: 4},
+    {0: 1, 1: 5},
+    {0: 1, 1: 10},
+    {0: 1, 1: 20},
+    ]
 
-#________xgboost__________different weight_________________
+n_tree_range = [150, 200, 300]
+max_depth_range = [5, 20, 35]
+
+
+
+for n_tree in n_tree_range:
+    for tree_depth in max_depth_range:
+        rf_results_train, rf_results_test = random_forest.class_weight_eperiment(df,
+                                                                                 x_vars,
+                                                                                 y_var,
+                                                                                 n_tree,
+                                                                                 tree_depth,
+                                                                                 class_weight_range,
+                                                                                 max_expruns = 5)
+        random_forest.print_results(rf_results_train, f"rf_cweight_tree{n_tree}_depth{tree_depth}_perf_train_allvars.csv")
+        random_forest.print_results(rf_results_test, f"rf_cweight_tree{n_tree}_depth{tree_depth}_perf_test_allvars.csv")                                                                         
+
+            
+
+
+
+#________XGBOOST___________________________
+
+
+#_________class weight no resample____________
+weight_range = [1, 3, 4, 5, 10, 20, 25, 30]
+n_tree_range = [150, 200, 350, 400, 450, 500]
+max_depth_range = [4, 5, 7, 10, 15, 20]
+
 
 weight_range = [1, 3, 4, 5, 10, 20, 25, 30]
+n_tree_range = [250]
+max_depth_range = [4, 5, 7, 10, 15, 20]
 
-#at 100 trees, max_depth = 5
-xgb_results_train_1, xgb_results_test_1 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 100, 
-                                                                         tree_depth = 5, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
-#print results
-#for train set 
-XGBoost.print_results(xgb_results_train_1, 'xgb_pweight1_trees100_depth5_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_1, 'xgb_pweight1_trees100_depth5_perf_test_allvars.csv', no_indi=5)
 
 
+for n_tree in n_tree_range:
+    for tree_depth in max_depth_range:
+        xgb_results_train, xgb_results_test = XGBoost.class_weight_eperiment(df, 
+                                                                             x_vars, 
+                                                                             y_var, 
+                                                                             n_tree, 
+                                                                             tree_depth, 
+                                                                             weight_range, 
+                                                                             max_expruns = 5)
+        XGBoost.print_results(xgb_results_train, f'xgb_pweight_trees{n_tree}_depth{tree_depth}_perf_train_allvars.csv', no_indi=5)
+        XGBoost.print_results(xgb_results_test, f'xgb_pweight_trees{n_tree}_depth{tree_depth}_perf_test_allvars.csv', no_indi=5)
 
 
+#______________class weight and resample
+xgb_results_train, xgb_results_test = XGBoost.class_weight_eperiment(df, 
+                                                                     x_vars, 
+                                                                     y_var, 
+                                                                     n_tree, 
+                                                                     tree_depth, 
+                                                                     weight_range, 
+                                                                     max_expruns = 5)
+XGBoost.print_results(xgb_results_train, f'xgb_pweight_trees{n_tree}_depth{tree_depth}_perf_train_allvars.csv', no_indi=5)
+XGBoost.print_results(xgb_results_test, f'xgb_pweight_trees{n_tree}_depth{tree_depth}_perf_test_allvars.csv', no_indi=5)
 
 
 
-#at 150 trees, max_depth = 4
-xgb_results_train_2_0, xgb_results_test_2_0 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 150, 
-                                                                         tree_depth = 4, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
 
-XGBoost.print_results(xgb_results_train_2_0, 'xgb_pweight1_trees150_depth4_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_2_0, 'xgb_pweight1_trees150_depth4_perf_test_allvars.csv', no_indi=5)
 
+#_________STACKING_________________________________
 
 
-
-
-#at 150 trees, max_depth = 5
-xgb_results_train_2, xgb_results_test_2 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 150, 
-                                                                         tree_depth = 5, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
-
-XGBoost.print_results(xgb_results_train_2, 'xgb_pweight1_trees150_depth5_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_2, 'xgb_pweight1_trees150_depth5_perf_test_allvars.csv', no_indi=5)
-
-
-
-
-
-
-
-#at 200 trees, max_depth = 4
-xgb_results_train_3_0, xgb_results_test_3_0 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 200, 
-                                                                         tree_depth = 4, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
-
-XGBoost.print_results(xgb_results_train_3_0, 'xgb_pweight1_trees200_depth4_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_3_0, 'xgb_pweight1_trees200_depth4_perf_test_allvars.csv', no_indi=5)
-
-
-
-
-#at 200 trees, max_depth = 5
-xgb_results_train_3, xgb_results_test_3 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 200, 
-                                                                         tree_depth = 5, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
-
-XGBoost.print_results(xgb_results_train_3, 'xgb_pweight1_trees200_depth5_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_3, 'xgb_pweight1_trees200_depth5_perf_test_allvars.csv', no_indi=5)
-
-
-
-#at 200 trees, max_depth = 10
-xgb_results_train_3_2, xgb_results_test_3_2 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 200, 
-                                                                         tree_depth = 10, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
-
-XGBoost.print_results(xgb_results_train_3_2, 'xgb_pweight_trees200_depth10_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_3_2, 'xgb_pweight_trees200_depth10_perf_test_allvars.csv', no_indi=5)
-
-
-
-
-
-
-
-
-#at 500 trees, max_depth = 4
-xgb_results_train_5_0, xgb_results_test_5_0 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 500, 
-                                                                         tree_depth = 4, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
-
-XGBoost.print_results(xgb_results_train_5_0, 'xgb_pweight1_trees500_depth4_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_5_0, 'xgb_pweight1_trees500_depth4_perf_test_allvars.csv', no_indi=5)
-
-
-
-
-
-
-
-#at 500 trees, max_depth = 5
-xgb_results_train_5, xgb_results_test_5 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 500, 
-                                                                         tree_depth = 5, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
-
-XGBoost.print_results(xgb_results_train_5, 'xgb_pweight1_trees500_depth5_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_5, 'xgb_pweight1_trees500_depth5_perf_test_allvars.csv', no_indi=5)
-
-
-
-
-
-#at 500 trees, max_depth = 10
-xgb_results_train_6, xgb_results_test_6 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 500, 
-                                                                         tree_depth = 10, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
-
-XGBoost.print_results(xgb_results_train_6, 'xgb_pweight_trees500_depth10_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_6, 'xgb_pweight_trees500_depth10_perf_test_allvars.csv', no_indi=5)
-
-
-
-#at 500 trees, max_depth = 15
-xgb_results_train_6_5, xgb_results_test_6_5 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 500, 
-                                                                         tree_depth = 15, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
-
-XGBoost.print_results(xgb_results_train_6_5, 'xgb_pweight_trees500_depth15_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_6_5, 'xgb_pweight_trees500_depth15_perf_test_allvars.csv', no_indi=5)
-
-
-
-
-#at 500 trees, max_depth = 20
-xgb_results_train_7, xgb_results_test_7 = XGBoost.class_weight_eperiment(df, 
-                                                                         x_vars, 
-                                                                         y_var, 
-                                                                         n_trees = 500, 
-                                                                         tree_depth = 20, 
-                                                                         pos_weight_range = weight_range, 
-                                                                         max_expruns = 5)
-
-XGBoost.print_results(xgb_results_train_7, 'xgb_pweight_trees500_depth20_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test_7, 'xgb_pweight_trees500_depth20_perf_test_allvars.csv', no_indi=5)
-
-
-
-
-
-
-
-
-
+stacking_train, stacking_test = stacking.running(df, 
+                                                 x_vars, 
+                                                 y_vars, 
+                                                 max_exprun = 5, 
+                                                 over_under_sampling = True)
 
