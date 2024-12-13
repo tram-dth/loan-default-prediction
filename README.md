@@ -7,5 +7,9 @@ This project, using the vehicle loand default provided by L&T Financial Services
 
 Different methods of mitigating class imbalance - resampling (SMOTE and SMO-TEENN), cost-sensitive learning, and a combination of both - are also investigated and compared. The results suggest that both models seems to benefit from larger numbers of trees. Contrary to traditional view, however, random forest models’ performance peaks at shallower depth, and deteriorates as maximum tree depths increases due to overfitting. Out of all combination of hyperparameters and balance methods, models using only increased positive class weight outperform ones which combine both increased positive class weight and resampling.
 
+**REPORT**
+
+Full report uploaded.
+
 **NOTE**
 - Stacking.py not finished
