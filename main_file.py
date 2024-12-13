@@ -19,6 +19,7 @@ import logistic_regress_oversample
 import decision_tree
 import random_forest
 import XGBoost
+import stacking
 
 
 
@@ -53,7 +54,10 @@ y_var = 'defaulted'
 
 
 
-#__________LOGISTIC REGRESSION
+# =============================================================================
+# LOGISTIC REGRESSION
+# =============================================================================
+
 decision_threshold_range = [0.4, 0.45, 0.5, 0.55, 0.6]
 
 #with class_weight = 'balanced"
@@ -73,36 +77,76 @@ logistic_regress_oversample.decision_threshold_experiment(df,
 
 
 
-#_________DECISON TREE___________
-#no oversampling
-tree_depth_range = [i for i in range(5, 61)]
-dt_results_train, dt_results_test = decision_tree.tree_depth_experiment(df, 
-                                                                        x_vars, 
-                                                                        y_var, 
-                                                                        tree_depth_range, 
-                                                                        max_expruns = 5)
-#print results
-decision_tree.print_results(dt_results_train, 'decision_tree_perf_train_allvars.csv')
-decision_tree.print_results(dt_results_test, 'decision_tree_perf_test_allvars.csv')
-#seems like stuff plateau around depth = 40
+# =============================================================================
+# DECISON TREE
+# =============================================================================
 
+def decision_tree_experiments(max_depth_range, resampling, max_expruns = 5):
+    results_train, results_test = decision_tree.tree_depth_experiment(df, 
+                                                                      x_vars, 
+                                                                      y_var, 
+                                                                      max_depth_range, 
+                                                                      max_expruns,
+                                                                      resampling)
+    #print results
+    if resampling:
+        decision_tree.print_results(results_train, 'decision_tree_{resampling}_perf_train_allvars.csv')
+        decision_tree.print_results(results_test, 'decision_tree_{resampling}_perf_test_allvars.csv')
+    else:
+        decision_tree.print_results(results_train, 'decision_tree_perf_train_allvars.csv')
+        decision_tree.print_results(results_test, 'decision_tree_perf_test_allvars.csv')
+    return 
+
+#no oversampling
+max_depth_range = [i for i in range(5, 61)]
+decision_tree_experiments(max_depth_range, resampling = False)
 
 #with oversampling
-tree_depth_range = [i for i in range(5, 61)]
-dt_results_train_over, dt_results_test_over = decision_tree.tree_depth_experiment(df, 
-                                                                                  x_vars, 
-                                                                                  y_var, 
-                                                                                  tree_depth_range, 
-                                                                                  max_expruns = 5,
-                                                                                  oversample=True)
-decision_tree.print_results(dt_results_train_over, 'decision_tree_oversample_perf_train_allvars.csv')
-decision_tree.print_results(dt_results_test_over, 'decision_tree_oversample_perf_test_allvars.csv')
+decision_tree_experiments(max_depth_range, resampling = 'smote')
+decision_tree_experiments(max_depth_range, resampling = 'smoteenn')
 
 
 
 
 
-#________RANDOM FOREST_______________
+# =============================================================================
+# Random forest and XGBoost tunning experiments
+# =============================================================================
+
+def tree_ensemble_tunning(model, resampling, n_tree_range, max_depth_range, class_weight_range, max_expruns = 5):
+    if model ==  'rf':
+        experiment = random_forest.class_weight_eperiment
+        print_results = random_forest.print_results
+    
+    elif model == 'xgb':
+        experiment = XGBoost.class_weight_eperiment
+        print_results = XGBoost.print_results
+    
+    for n_tree in n_tree_range:
+        for tree_depth in max_depth_range:
+            results_train, results_test = experiment(df,
+                                                    x_vars,
+                                                    y_var,
+                                                    n_tree,
+                                                    tree_depth,
+                                                    class_weight_range,
+                                                    resampling,
+                                                    max_expruns)
+            if resampling:
+                print_results(results_train, f"{model}_{resampling}_pweight_trees{n_tree}_depth{tree_depth}_perf_train_allvars.csv")
+                print_results(results_test, f"{model}_{resampling}_pweight_trees{n_tree}_depth{tree_depth}_perf_test_allvars.csv")                                                                             
+            else:
+                print_results(results_train, f"{model}_pweight_trees{n_tree}_depth{tree_depth}_perf_train_allvars.csv")
+                print_results(results_test, f"{model}_pweight_trees{n_tree}_depth{tree_depth}_perf_test_allvars.csv")                                                                         
+        
+    return
+
+
+
+
+#Random forest
+
+#no resample
 class_weight_range = [ 
     {0: 1, 1: 1},
     {0: 1, 1: 3},
@@ -115,73 +159,43 @@ class_weight_range = [
 n_tree_range = [150, 200, 300]
 max_depth_range = [5, 20, 35]
 
+tree_ensemble_tunning('rf', False, n_tree_range, max_depth_range, class_weight_range)
 
-
-for n_tree in n_tree_range:
-    for tree_depth in max_depth_range:
-        rf_results_train, rf_results_test = random_forest.class_weight_eperiment(df,
-                                                                                 x_vars,
-                                                                                 y_var,
-                                                                                 n_tree,
-                                                                                 tree_depth,
-                                                                                 class_weight_range,
-                                                                                 max_expruns = 5)
-        random_forest.print_results(rf_results_train, f"rf_cweight_tree{n_tree}_depth{tree_depth}_perf_train_allvars.csv")
-        random_forest.print_results(rf_results_test, f"rf_cweight_tree{n_tree}_depth{tree_depth}_perf_test_allvars.csv")                                                                         
-
-            
+#smote and smoteenn
+class_weight_range = [{0: 1, 1: 1}, 
+                      {0:1, 1:2},
+                      {0:1, 1:3},
+                      {0: 1, 1: 4} ]
+n_tree_range = [200, 300]
+max_depth_range = [5, 20, 35]
 
 
 
-#________XGBOOST___________________________
+tree_ensemble_tunning('rf', 'smote', n_tree_range, max_depth_range, class_weight_range, max_expruns=3)
+tree_ensemble_tunning('rf', 'smoteenn', n_tree_range, max_depth_range, class_weight_range, max_expruns=3)
+
+         
 
 
-#_________class weight no resample____________
+
+#___________XGBoost
+
+#no resample
 weight_range = [1, 3, 4, 5, 10, 20, 25, 30]
 n_tree_range = [150, 200, 350, 400, 450, 500]
 max_depth_range = [4, 5, 7, 10, 15, 20]
 
-
-weight_range = [1, 3, 4, 5, 10, 20, 25, 30]
-n_tree_range = [250]
-max_depth_range = [4, 5, 7, 10, 15, 20]
+tree_ensemble_tunning('xgb', False, n_tree_range, max_depth_range, weight_range)
 
 
-
-for n_tree in n_tree_range:
-    for tree_depth in max_depth_range:
-        xgb_results_train, xgb_results_test = XGBoost.class_weight_eperiment(df, 
-                                                                             x_vars, 
-                                                                             y_var, 
-                                                                             n_tree, 
-                                                                             tree_depth, 
-                                                                             weight_range, 
-                                                                             max_expruns = 5)
-        XGBoost.print_results(xgb_results_train, f'xgb_pweight_trees{n_tree}_depth{tree_depth}_perf_train_allvars.csv', no_indi=5)
-        XGBoost.print_results(xgb_results_test, f'xgb_pweight_trees{n_tree}_depth{tree_depth}_perf_test_allvars.csv', no_indi=5)
+#______resample_________________
+weight_range = [1, 2, 3,  4]
+n_tree_range = [200, 500]
+max_depth_range = [4, 7]
 
 
-#______________class weight and resample
-xgb_results_train, xgb_results_test = XGBoost.class_weight_eperiment(df, 
-                                                                     x_vars, 
-                                                                     y_var, 
-                                                                     n_tree, 
-                                                                     tree_depth, 
-                                                                     weight_range, 
-                                                                     max_expruns = 5)
-XGBoost.print_results(xgb_results_train, f'xgb_pweight_trees{n_tree}_depth{tree_depth}_perf_train_allvars.csv', no_indi=5)
-XGBoost.print_results(xgb_results_test, f'xgb_pweight_trees{n_tree}_depth{tree_depth}_perf_test_allvars.csv', no_indi=5)
+tree_ensemble_tunning('xgb', 'smote', n_tree_range, max_depth_range, weight_range)
+tree_ensemble_tunning('xgb', 'smoteenn', n_tree_range, max_depth_range, weight_range)
 
 
-
-
-
-#_________STACKING_________________________________
-
-
-stacking_train, stacking_test = stacking.running(df, 
-                                                 x_vars, 
-                                                 y_vars, 
-                                                 max_exprun = 5, 
-                                                 over_under_sampling = True)
 

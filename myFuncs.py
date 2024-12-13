@@ -122,7 +122,8 @@ large_num_vars = [
     'sec_current_balance',
     'sec_sanctioned_amount',
     'sec_disbursed_amount',
-    'primary_instal_amt'
+    'primary_instal_amt',
+    'sec_instal_amt'
     ]
 
 x_vars = [
