@@ -63,7 +63,7 @@ def random_forest(run_num, x_train, x_test, y_train, y_test, n_trees, tree_depth
 
 
 
-def trials(df, x_vars, y_vars, n_trees, tree_depth, weight, max_expruns, over_under_sampling = False): 
+def trials(df, x_vars, y_vars, n_trees, tree_depth, weight, resampling, max_expruns): 
     auc_all_train = [0]*max_expruns
     acc_all_train = [0]*max_expruns
     f1_all_train = [0]*max_expruns
@@ -81,10 +81,18 @@ def trials(df, x_vars, y_vars, n_trees, tree_depth, weight, max_expruns, over_un
         
         x_train, x_test, y_train, y_test = mf.data_split_random(df, x_vars, y_vars, run_num)
         
-        if over_under_sampling == True:
-           resampler = mf.over_under_sampler()
-           x_train, y_train = resampler.fit_resample(x_train, y_train)
-        
+        if resampling:
+            if resampling == 'smote':
+                print('doing smote')
+                sampler = imblearn.over_sampling.SMOTE(random_state = 50-run_num)
+            elif resampling == 'smoteenn':
+                print('doing smoteenn')
+                sampler = imblearn.combine.SMOTEENN(random_state=50-run_num)
+            
+            print(f'resampled random forest at N trees = {n_trees}, depth = {tree_depth}')
+            x_train, y_train = sampler.fit_resample(x_train, y_train)
+            
+            
         result_train, result_test = random_forest(run_num,
                                                   x_train, 
                                                   x_test, 
@@ -113,11 +121,18 @@ def trials(df, x_vars, y_vars, n_trees, tree_depth, weight, max_expruns, over_un
 
 
 
-def class_weight_eperiment(df, x_vars, y_vars, n_trees, tree_depth, class_weight_range, max_expruns):
+def class_weight_eperiment(df, x_vars, y_vars, n_trees, tree_depth, class_weight_range, resampling, max_expruns):
     results_train = {}
     results_test = {}
     for w in class_weight_range:
-        r_train, r_test = trials(df, x_vars, y_vars, n_trees, tree_depth, w, max_expruns)
+        r_train, r_test = trials(df, 
+                                 x_vars, 
+                                 y_vars, 
+                                 n_trees, 
+                                 tree_depth, 
+                                 w, 
+                                 resampling,
+                                 max_expruns)
         pos_w = w[1]
         results_train[pos_w] = r_train
         results_test[pos_w] = r_test
@@ -141,8 +156,8 @@ def n_trees_experiment(df, x_vars, y_vars, n_trees_range, tree_depth, max_exprun
 
 
 
-def print_results(results, file_name, no_indi = 3):
-    cols = ['pos_weight',
+def print_results(results, file_name):
+    cols = ['positive_weight',
             'mean_auc', 'sd_auc', 
             'mean_acc', 'sd_acc', 
             'mean_f1_score', 'sd_f1_score',
@@ -154,7 +169,7 @@ def print_results(results, file_name, no_indi = 3):
     for k in results.keys():
         row = [k]
         print('\n\nRandom Forest performance at positive class weight =  : ', k)
-        for i in range(0, no_indi):
+        for i in range(0, len(indis)):
             mean_indicator = np.mean(results[k][i]).round(4)
             sd_indicator = np.std(results[k][i], axis = 0).round(2)
             row.append(mean_indicator)
@@ -163,7 +178,7 @@ def print_results(results, file_name, no_indi = 3):
             print(f'the sd {indis[i]}  =  {sd_indicator}')
                
         L.append(row)
-    L = pd.DataFrame(L, columns= cols[: (1+no_indi*2)])
+    L = pd.DataFrame(L, columns= cols)
     
     #print to csv
     L.to_csv(file_name, sep = ',', header=True)

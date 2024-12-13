@@ -35,15 +35,15 @@ df = mf.data_format(df, log_transform= False)
 
 #for the whole dataset
 
-df.describe().round(3).transpose().to_csv('descriptive_stats.csv', sep=',', encoding='utf-8', index=True, header=True)
+df.describe().round(3).transpose().to_csv('descriptive_stats.csv', sep='&', encoding='utf-8', index=True, header=True)
 
 #for defaulted 
 descriptive_defaulted = df.loc[(df['defaulted'] == 1)].describe().round(3)
-descriptive_defaulted.transpose().to_csv('descriptive_defaulted.csv', sep=',', encoding='utf-8', index=True, header=True)
+descriptive_defaulted.transpose().to_csv('descriptive_defaulted.csv', sep='&', encoding='utf-8', index=True, header=True)
 
 #for not defaulted
 descriptive_not_defaulted = df.loc[(df['defaulted'] == 0)].describe().round(3)
-descriptive_not_defaulted.transpose().to_csv('descriptive_not_defaulted.csv', sep=',', encoding='utf-8', index=True, header=True)
+descriptive_not_defaulted.transpose().to_csv('descriptive_not_defaulted.csv', sep='&', encoding='utf-8', index=True, header=True)
 
 
 
@@ -70,7 +70,10 @@ L_high_corr_vars = sorted(set(L_high_corr_vars))
 
 #_____VISUALISATION_________________
 
-mf.histogram_vars(df, continuous_vars, bins = 100, colour= 'blue', group_by= False, print_folder = 'figures\\overall_no_log')
+mf.remove_outliers(df, 'pri_current_balance' , q = 0.99995)
+
+
+#mf.histogram_vars(df, continuous_vars, bins = 100, colour= 'blue', group_by= False, print_folder = 'figures\\overall_no_log')
 
 mf.histogram_vars(df, continuous_vars, bins = 100, colour = False, group_by= 'defaulted', print_folder = 'figures\\grouped_no_log')
 
@@ -82,21 +85,8 @@ mf.histogram_vars(df.loc[(df['defaulted'] == 0)], continuous_vars, bins = 100, c
 mf.histogram_grouped(df, 'disbursed_amount' , bins = 100, group_by = 'defaulted', print_folder=False)
 
 
-L_boxplot = [
-     'disbursed_amount',
-     'ltv',
-     'pri_current_balance',
-     'pri_disbursed_amount',
-     'pri_sanctioned_amount',
-     'primary_instal_amt',
-     'sec_current_balance',
-     'sec_disbursed_amount',
-     'sec_instal_amt',
-     'sec_sanctioned_amount'
-     ]
 
-
-mf.boxplot_vars(df, 'defaulted', L_boxplot)
+mf.boxplot_vars(df, 'defaulted', continuous_vars, print_folder='figures\\grouped_no_log')
 
 
 
@@ -133,7 +123,7 @@ df_notdefaulted.loc[df['pri_current_balance'] > 650]['pri_current_balance']
 
 
 #__________NOW SOME OUTLIERS REMOVED, AND WITH LOG TRANSFORM_____
-dfnew = mf.import_csv(train_data_path)
+dfnew = mf.import_csv(data_path)
 mf.remove_outliers(dfnew, 'pri_current_balance', q = 0.99)
 
 dfnew = mf.data_format(dfnew, log_transform = True)
